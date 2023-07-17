@@ -1,0 +1,419 @@
+
+'** DOCUMENTAÇÃO **
+
+'Este código VBA foi criado para automatizar a publicação e o envio de e-mails com informações de Vendas
+ 
+'ESTRUTURA E OBJETIVO DAS ROTINAS
+    
+    '1. AdicionarReferênciaOutlook() --> prepara o excel do usuário para envio de e-mails pelo Outlook
+
+     'Passo a passo/subrotinas:
+    '[A] --> Preparação do Arquivo
+        '01.Chama a rotina que prepara o Outlook para envio dos e-mails
+        '02.Prepara o excel para execução da macro
+        '03.Identifica as informações do arquivo onde a macro será executada
+        '04.Armazena as primeiras variáveis que serão utilizadas no envio dos e-mails
+        '05.Valida se há informações suficientes na base e nos parametros para comunicação com as áreas
+
+    '[B] --> Início da rotina
+        '06.Inicia a rotina e a contagem do tempo de execução da macro
+        '07.Identifica a região do arquivo onde estão os dados que serão colados nos e-mails
+        '08.Armazena as demais variáveis que serão utilizadas no envio dos e-mails
+        '09.Identifica e armazena em uma variável o código dos departamentos que receberão os e-mails
+
+    '[C] --> Execução da rotina
+        '10.Inicia a rotina (loop) para envio sequencial de cada um dos e-mails
+        '11.Armazena em variável os endereços de e-mail dos destinatários
+        '12.Filtra na base o código do Canal para quem está sendo preparado o e-mail
+        '13.Filtra na base o período para o qual está sendo preparado o e-mail
+        '14.Copia os dados filtrados no passo anterior
+
+    '[D] --> Cria o arquivo temporário
+        '15.Cria um novo arquivo excel temporário que será anexado ao e-mail
+        '16.Cola os dados copiados no passo anterior
+        '17.Formata/padroniza a planilha
+        '18.Verifica se já existe um arquivo temporário anterior na pasta [deleta, caso exista]
+        '19.Salva o arquivo temporário, que será anexado ao e-mail
+
+    '[E] --> Cria um novo e-mail (outlook)
+        '20.Inicia a criação do novo e-mail (Outlook)
+        '21.Faz a exibição do e-mail
+        '22.Define o remetente e os destinatários (identificados nos passos anteriores)
+        '23.Inclui o assunto e o anexo (excel temporário)
+        '24.Identifica o horário atual (momento do envio) para a saudação do e-mail (bom dia, boa tarde)
+        '25.Preenche as informações do corpo do e-mail
+        '26.Edita o arquivo temporário para copiar somente as colunas que devem aparecer no corpo do e-mail
+        '27.Copia os dados que ficaram no arquivo temporário para o corpo do e-mail
+        '28.Fecha sem salvar, e deleta o arquivo temporário
+        '29.Finaliza rotina de edição do e-mail
+        '30.Envia o e-mail e finaliza rotina do Outlook
+
+    '[F] --> Tratamentos de erro
+        '31.Tratamento de erro - se a rotina chegar nesta linha, pula o erro.
+        '32.Se der algum erro nos passos anteriores, executa o tratamento do erro
+        '33.Fecha o arquivo (passo importante em tratamento de eventuais erros)
+
+    '[G] --> Volta/finaliza os ajustes do excel
+        '34.Volta os padrões do arquivo do excel, para finalizar a macro
+
+    '[H] --> Exibe a mensagem final sobre a execução de toda a rotina
+        '35.Cálcula do tempo de execução da macro
+        '36.Prepara a mensagem final sobre o resultado da execução da macro com a contagem de e-mails enviados
+        '37.Prepara o texto de minutos e segundos
+        '38.Prepara a mensagem verificando se houve erro na execução
+        '39.Monta a mensagem Final
+        '40.Exibe a mensagem Final com ícones
+
+'Documento e código preparado por Pedro Oliveira - [1pedro.osilva@gmail.com]
+
+'___________________________________________________________________________________________________________________________________________________________________________________________
+
+Sub AdicionarReferenciaOutlook()
+
+If Not ReferenciaAdicionada("Microsoft Outlook") Then
+    ThisWorkbook.VBProject.References.AddFromGuid GUID:="{00062FFF-0000-0000-C000-000000000046}", Major:=9, Minor:=5
+End If
+End Sub
+
+Function ReferenciaAdicionada(ByVal nomeReferencia As String) As Boolean
+
+Dim ref As Object
+    On Error Resume Next
+    
+    For Each ref In ThisWorkbook.VBProject.References
+        If ref.Name = nomeReferencia Then
+            ReferenciaAdicionada = True
+            Exit Function
+        End If
+    Next ref
+
+ReferenciaAdicionada = False
+   On Error GoTo 0
+End Function
+
+Sub EnviarVendasMail()
+ 
+Dim OutApplication As Object
+Dim nEmail As Object
+Dim vCountMails As Long
+Dim vQtdmails As String
+Dim vNomeArquivoVendas As String
+Dim vArqTempVendas As Workbook
+Dim vNomeArqTemp As String
+Dim vColunaCanais As Range
+Dim vColunaDelete As Range
+Dim vRng As Range
+Dim vBusca As String
+Dim vColCan As Integer
+Dim vColDelete As Integer
+Dim vHoraAtual As Date
+Dim vSaudacao As String
+Dim startTime As Double
+Dim endTime As Double
+Dim executionTimeSeconds As Double
+Dim executionTimeMinutes As Double
+Dim mensagem As String
+
+    '01.Chama a rotina que prepara o Outlook para envio dos e-mails
+    'Call AdicionarReferenciaOutlook
+
+    '02.Prepara o excel para execução da macro
+    Application.ScreenUpdating = False
+    On Error GoTo Erro
+    vCountMails = 0
+
+    vMsgErroYN = ""
+
+    '03.Identifica as informações do arquivo onde a macro será executada
+    vDiretorioAtual = ThisWorkbook.Path
+    vNomeArquivoVendas = ThisWorkbook.Name
+
+    '04.Armazena as primeiras variáveis que serão utilizadas no envio dos e-mails
+    Worksheets("bd_aux").Visible = xlSheetVisible
+    Worksheets("bd_aux").Activate
+    vQtdmails = Range("C2").Value
+    vPeriodo = Format(Range("c3").Value, "mmm/yy")
+
+    '05.Valida se há informações suficientes na base e nos parametros para comunicação com as áreas
+    If vQtdmails = 0 Then
+        Worksheets("enviar").Activate
+        mensagem = "Não há dados para envio no período de " & vPeriodo & vbCrLf & "Verifique as informações de envio nas bases e tente novamente."
+        MsgBox mensagem, vbCritical
+        Worksheets("bd_aux").Visible = xlSheetHidden
+        Exit Sub
+    Else
+        Worksheets("enviar").Activate
+        resposta = MsgBox("Serão enviados " & vQtdmails & " e-mails de " & vPeriodo & vbCrLf & vbCrLf & "Deseja continuar?", vbQuestion + vbYesNo)
+            If resposta = vbYes Then
+                GoTo Inicio
+            Else
+                Worksheets("enviar").Activate
+                Worksheets("bd_aux").Visible = xlSheetHidden
+                Exit Sub
+            End If
+    End If
+
+'06.Inicia a rotina e a contagem do tempo de execução da macro
+Inicio:
+startTime = Timer
+
+    '07.Identifica a região do arquivo onde estão os dados que serão colados nos e-mails
+    Worksheets("bd_envios").Visible = xlSheetVisible
+    Worksheets("bd_envios").Activate
+    ActiveSheet.AutoFilter.ShowAllData
+    vRng.AutoFilterMode = True
+    Range("A1").Select
+    lastRow = Cells(Rows.Count, ActiveCell.Column).End(xlUp).Row
+    lastcolumn = ActiveCell.End(xlToRight).Column
+
+    Set vRng = Range(ActiveCell, Cells(lastRow, lastcolumn))
+    vRng.AutoFilter
+
+    '08.Armazena as demais variáveis que serão utilizadas no envio dos e-mails
+    Worksheets("enviar").Activate
+    vDestinCC = Range("D5").Value
+    vAssunto = Range("D7").Value
+    vCorpoL1 = Range("D9").Value
+
+    '09.Identifica e armazena em uma variável o código dos departamentos que receberão os e-mails
+    Worksheets("bd_aux").Activate
+    Range("B2").Activate
+    Set vColunaCanais = Range(ActiveCell, Cells(Rows.Count, ActiveCell.Column).End(xlUp))
+ 
+    '10.Inicia a rotina (loop) para envio sequencial de cada um dos e-mails
+    For Each Canal In vColunaCanais
+
+        '11.Armazena em variável os endereços de e-mail dos destinatários
+        Worksheets("bd_e-mails").Activate
+        ActiveSheet.AutoFilter.ShowAllData
+        Range("C2").Select
+
+        vBusca = Canal
+        Set vRangeDesc = Range("C:C")
+        Set vResultadoBusca = vRangeDesc.Find(vBusca, LookIn:=xlValues, LookAt:=xlWhole, MatchCase:=False)
+
+            If vResultadoBusca Is Nothing Then
+                GoTo ProximoCanal 'armazenar contagem?
+            Else
+                vRangeDesc.Find(vBusca, LookIn:=xlValues, LookAt:=xlWhole, MatchCase:=False).Select
+                ActiveCell.Offset(0, -1).Select
+                vDestinatario = ActiveCell.Value
+            End If
+ 
+        Workbooks(vNomeArquivoVendas).Sheets("bd_envios").Activate
+
+        '12.Filtra na base o código do Canal para quem está sendo preparado o e-mail
+        vBusca = "*Canal*"
+        Set vRangeCab = Range("1:1")
+        Set vResultadoBusca = vRangeCab.Find(vBusca, LookIn:=xlValues, LookAt:=xlWhole, MatchCase:=False)
+
+            If vResultadoBusca Is Nothing Then
+                GoTo ProximoCanal
+            Else
+                vRangeCab.Find(vBusca, LookIn:=xlValues, LookAt:=xlWhole, MatchCase:=False).Select
+                vColCan = ActiveCell.Column
+            End If
+        vRng.AutoFilter Field:=vColCan, Criteria1:=Canal
+
+        '13.Filtra na base o período para o qual está sendo preparado o e-mail
+        vBusca = "*PERÍODO*"
+        Set vRangeCab = Range("1:1")
+        Set vResultadoBusca = vRangeCab.Find(vBusca, LookIn:=xlValues, LookAt:=xlWhole, MatchCase:=False)
+
+            If vResultadoBusca Is Nothing Then
+                GoTo ProximoCanal
+            Else
+                vRangeCab.Find(vBusca, LookIn:=xlValues, LookAt:=xlWhole, MatchCase:=False).Select
+                vColPeriodo = ActiveCell.Column
+            End If
+        
+        vRng.AutoFilter Field:=vColPeriodo, Criteria1:=vPeriodo
+
+        '14.Copia os dados filtrados no passo anterior
+        ActiveCell.CurrentRegion.Copy
+
+        '15.Cria um novo arquivo excel temporário que será anexado ao e-mail
+        Set vArqTempVendas = Application.Workbooks.Add
+        vArqTempVendas.Sheets(1).Name = "Vendas - " & Canal
+        vNomeArqTemp = Canal & " - Demonstrativo - Vendas.xlsx"
+
+        '16.Cola os dados copiados no passo anterior
+        Range("B2").PasteSpecial Paste:=xlPasteValuesAndNumberFormats
+        Range("B2").PasteSpecial Paste:=xlPasteFormats
+
+        '17.Formata/padroniza a planilha
+        Columns("A").ColumnWidth = 4
+        ActiveWindow.DisplayGridlines = False
+ 
+        ActiveCell.CurrentRegion.Select
+        Cells.Font.Size = 11
+        Cells.Font.Name = "Calibri"
+        Cells.WrapText = False
+        Selection.Borders.LineStyle = xlContinuous
+        Selection.BorderAround Weight:=xlMedium
+        Cells.EntireColumn.AutoFit
+
+        '18.Verifica se já existe um arquivo temporário anterior na pasta [deleta, caso exista]
+        If Dir(vDiretorioAtual & "\" & vNomeArqTemp) <> "" Then
+            Kill vDiretorioAtual & "\" & vNomeArqTemp
+        Else
+        End If
+
+        '19.Salva o arquivo temporário, que será anexado ao e-mail
+        vArqTempVendas.SaveAs vDiretorioAtual & "\" & vNomeArqTemp
+
+        '20.Inicia a criação do novo e-mail (Outlook)
+        Set OutApplication = CreateObject("Outlook.Application")
+        Set nEmail = OutApplication.CreateItem(olMailItem)
+
+        '21.Faz a exibição do e-mail (passo importante para que o e-mail fique com a assinatura de quem estiver enviado)
+        With nEmail
+        .Display
+
+        '22.Define o remetente e os destinatários (identificados nos passos anteriores)
+        .SentOnBehalfOfName = "remetente@controlesfremotetech.com.br" '(pegar o nome da caixa de envios)
+        .To = vDestinatario
+        .CC = vDestinCC
+
+        '23.Inclui o assunto e o anexo (excel temporário)
+        .Subject = vAssunto & " | " & Canal
+        .Attachments.Add vDiretorioAtual & "\" & vNomeArqTemp
+
+        '24.Identifica o horário atual (momento do envio) para a saudação do e-mail (bom dia, boa tarde)
+        vHoraAtual = Now()
+        If Hour(vHoraAtual) < 12 Then
+            vSaudacao = "bom dia"
+        ElseIf Hour(vHoraAtual) >= 12 Then
+            vSaudacao = "boa tarde"
+        End If
+
+            '25.Preenche as informações do corpo do e-mail
+            With .GetInspector.WordEditor.Windows(1).Selection
+                .TypeText "Prezados, " & vSaudacao & ","
+                .TypeParagraph
+                .TypeParagraph
+                .TypeText vCorpoL1 & " " & vPeriodo & ":"
+                .TypeParagraph
+                .TypeParagraph
+
+            '26.Edita o arquivo temporário para copiar somente as colunas que devem aparecer no corpo do e-mail
+            Workbooks(vNomeArquivoVendas).Sheets("bd_aux").Activate
+            Range("E2").Activate
+            Set vColunaDelete = Range(ActiveCell, Cells(Rows.Count, ActiveCell.Column).End(xlUp))
+
+            Workbooks(vNomeArqTemp).Sheets("Vendas - " & Canal).Activate
+
+                For Each deletar In vColunaDelete
+
+                    vBusca = deletar
+                    Set vRangeCab = Range("2:2")
+                    Set vResultadoBusca = vRangeCab.Find(vBusca, LookIn:=xlValues, LookAt:=xlWhole, MatchCase:=False)
+
+                    If vResultadoBusca Is Nothing Then
+                        GoTo ProximoDelete
+                    Else
+                        vRangeCab.Find(vBusca, LookIn:=xlValues, LookAt:=xlWhole, MatchCase:=False).Select
+                        vColDelete = ActiveCell.Column
+                    End If
+
+                    If ActiveCell.Value = deletar Then
+                        Columns(vColDelete).Delete
+                    End If
+ProximoDelete:
+                Next deletar
+
+            '27.Copia os dados que ficaram no arquivo temporário para o corpo do e-mail
+            Range("B2").Select
+            ActiveCell.CurrentRegion.Copy
+            .Paste
+            Application.CutCopyMode = False
+            .TypeParagraph
+
+            '28.Fecha sem salvar, e deleta o arquivo temporário
+            vArqTempVendas.Close SaveChanges = False
+            Kill vDiretorioAtual & "\" & vNomeArqTemp
+
+            '29.Finaliza rotina de edição do e-mail
+            End With
+
+        '30.Envia o e-mail e finaliza rotina do Outlook
+        .Send
+        vCountMails = vCountMails + 1
+
+        End With
+ 
+ProximoCanal:
+
+    Next Canal
+
+
+'31.Tratamento de erro - se a rotina chega nesta linha, pula o erro.
+'32.Se der algum erro nos passos anteriores, executa o tratamento do erro
+GoTo PulaErro
+Erro:
+vErro = "Y"
+PulaErro:
+ 
+Fim:
+    '33.Fecha o arquivo (passo importante em tratamento de eventuais erros)
+    On Error Resume Next
+        vArqTempVendas.Close SaveChanges = False
+    On Error GoTo 0
+
+    '34.Volta os padrões do arquivo do excel, para finalizar a macro
+    Workbooks(vNomeArquivoVendas).Sheets("bd_envios").Activate
+    ActiveSheet.AutoFilter.ShowAllData
+    Worksheets("enviar").Activate
+    Worksheets("bd_aux").Visible = xlSheetHidden
+    Worksheets("bd_e-mails").Visible = xlSheetHidden
+
+    Application.ScreenUpdating = True
+
+    '35.Cálcula do tempo de execução da macro
+    endTime = Timer
+    executionTimeSeconds = endTime - startTime
+    executionTimeMinutes = executionTimeSeconds / 60
+    vMinutosPart = Format(Int(executionTimeMinutes), "0")
+    vSegundosPart = Format(((executionTimeMinutes) - Int(executionTimeMinutes)) * 60, "0")
+
+    '36.Prepara a mensagem final sobre o resultado da execução da macro com a contagem de e-mails enviados
+    If vCountMails = 0 Then
+            msgPart1 = "Nenhum "
+            msgPart2 = " e-mail enviado"
+            MsgCountMails = ""
+    Else
+            MsgCountMails = vCountMails
+            If vCountMails > 1 Then
+                msgPart1 = "Foram enviados "
+                msgPart2 = " e-mails "
+            Else
+                msgPart1 = "Foi enviado apenas "
+                msgPart2 = " e-mail "
+            End If
+    End If
+
+    '37.Prepara o texto para exibição da contagem de minutos e segundos
+    If vMinutosPart >= 1 Then
+        msgPart3 = vMinutosPart & " minutos e "
+    Else
+        msgPart3 = ""
+    End If
+ 
+    '38.Prepara a mensagem verificando se houve erro na execução
+    If vErro = "Y" Then
+        vMsgErroYN = "Problema na execução da Macro: verifique os parametros e tente novamente."
+    Else
+        vMsgErroYN = "Envios realizados com Sucesso!"
+    End If
+ 
+    '39.Monta a mensagem Final
+    vMsgFinal = vMsgErroYN & vbCrLf & vbCrLf & msgPart1 & MsgCountMails & msgPart2 & vbCrLf & vbCrLf & "Tempo de execução: " & msgPart3 & vSegundosPart & " segundos."
+
+    '40.Exibe a mensagem Final com ícones
+    If vErro = "Y" Then
+        MsgBox vMsgFinal, vbCritical
+    Else
+        MsgBox vMsgFinal, vbInformation
+    End If
+
+End Sub
