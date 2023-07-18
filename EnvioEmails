@@ -1,73 +1,3 @@
-
-'** DOCUMENTAÇÃO **
-
-'Este código VBA foi criado para automatizar a publicação e o envio de e-mails com informações de Vendas
- 
-'ESTRUTURA E OBJETIVO DAS ROTINAS
-    
-    '1. AdicionarReferênciaOutlook() --> prepara o excel do usuário para envio de e-mails pelo Outlook
-
-     'Passo a passo/subrotinas:
-    '[A] --> Preparação do Arquivo
-        '01.Chama a rotina que prepara o Outlook para envio dos e-mails
-        '02.Prepara o excel para execução da macro
-        '03.Identifica as informações do arquivo onde a macro será executada
-        '04.Armazena as primeiras variáveis que serão utilizadas no envio dos e-mails
-        '05.Valida se há informações suficientes na base e nos parametros para comunicação com as áreas
-
-    '[B] --> Início da rotina
-        '06.Inicia a rotina e a contagem do tempo de execução da macro
-        '07.Identifica a região do arquivo onde estão os dados que serão colados nos e-mails
-        '08.Armazena as demais variáveis que serão utilizadas no envio dos e-mails
-        '09.Identifica e armazena em uma variável o código dos departamentos que receberão os e-mails
-
-    '[C] --> Execução da rotina
-        '10.Inicia a rotina (loop) para envio sequencial de cada um dos e-mails
-        '11.Armazena em variável os endereços de e-mail dos destinatários
-        '12.Filtra na base o código do Canal para quem está sendo preparado o e-mail
-        '13.Filtra na base o período para o qual está sendo preparado o e-mail
-        '14.Copia os dados filtrados no passo anterior
-
-    '[D] --> Cria o arquivo temporário
-        '15.Cria um novo arquivo excel temporário que será anexado ao e-mail
-        '16.Cola os dados copiados no passo anterior
-        '17.Formata/padroniza a planilha
-        '18.Verifica se já existe um arquivo temporário anterior na pasta [deleta, caso exista]
-        '19.Salva o arquivo temporário, que será anexado ao e-mail
-
-    '[E] --> Cria um novo e-mail (outlook)
-        '20.Inicia a criação do novo e-mail (Outlook)
-        '21.Faz a exibição do e-mail
-        '22.Define o remetente e os destinatários (identificados nos passos anteriores)
-        '23.Inclui o assunto e o anexo (excel temporário)
-        '24.Identifica o horário atual (momento do envio) para a saudação do e-mail (bom dia, boa tarde)
-        '25.Preenche as informações do corpo do e-mail
-        '26.Edita o arquivo temporário para copiar somente as colunas que devem aparecer no corpo do e-mail
-        '27.Copia os dados que ficaram no arquivo temporário para o corpo do e-mail
-        '28.Fecha sem salvar, e deleta o arquivo temporário
-        '29.Finaliza rotina de edição do e-mail
-        '30.Envia o e-mail e finaliza rotina do Outlook
-
-    '[F] --> Tratamentos de erro
-        '31.Tratamento de erro - se a rotina chegar nesta linha, pula o erro.
-        '32.Se der algum erro nos passos anteriores, executa o tratamento do erro
-        '33.Fecha o arquivo (passo importante em tratamento de eventuais erros)
-
-    '[G] --> Volta/finaliza os ajustes do excel
-        '34.Volta os padrões do arquivo do excel, para finalizar a macro
-
-    '[H] --> Exibe a mensagem final sobre a execução de toda a rotina
-        '35.Cálcula do tempo de execução da macro
-        '36.Prepara a mensagem final sobre o resultado da execução da macro com a contagem de e-mails enviados
-        '37.Prepara o texto de minutos e segundos
-        '38.Prepara a mensagem verificando se houve erro na execução
-        '39.Monta a mensagem Final
-        '40.Exibe a mensagem Final com ícones
-
-'Documento e código preparado por Pedro Oliveira - [1pedro.osilva@gmail.com]
-
-'___________________________________________________________________________________________________________________________________________________________________________________________
-
 Sub AdicionarReferenciaOutlook()
 
 If Not ReferenciaAdicionada("Microsoft Outlook") Then
@@ -90,6 +20,8 @@ Dim ref As Object
 ReferenciaAdicionada = False
    On Error GoTo 0
 End Function
+
+'---------------------------------
 
 Sub EnviarVendasMail()
  
