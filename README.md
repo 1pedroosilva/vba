@@ -1,4 +1,4 @@
-# vba
+# vba Excel
 Projeto em VBA criado para automatizar o envio de e-mails a partir de uma base de dados dividida em 4 abas do Excel [Exemplo com informações Vendas para as áreas]
 
 # Estrutura e objetivo principal das rotinas:
